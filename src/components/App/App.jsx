@@ -19,14 +19,15 @@ export class App extends Component {
     query: '',
   };
 
-  async componentDidUpdate(_, prevState) {
-    if (prevState.query !== this.state.query) {
+  async componentDidUpdate(_, { query: prevQuery, page: prevPage }) {
+    const { query, page } = this.state;
+    if (prevQuery !== query) {
       this.setState({ isLoading: true });
       const items = await this.getPhotos();
       this.setState({ items: items, isLoading: false });
       return;
     }
-    if (prevState.page !== this.state.page) {
+    if (prevPage !== page) {
       this.setState({ isLoading: true });
       const items = await this.getPhotos();
       this.setState(({ items: prevItems }) => ({
