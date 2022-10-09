@@ -9,5 +9,5 @@ export const fetchPhotos = async ({ name, page }) => {
     `/?key=${KEY}&image_type=photo&orientation=horizontal&page=${page}&per_page=12&q=${name}`
   );
 
-  return response.data.hits;
+  return { items: response.data.hits, total: response.data.total };
 };

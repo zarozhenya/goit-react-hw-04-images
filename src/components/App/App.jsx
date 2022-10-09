@@ -1,4 +1,6 @@
 import { Component } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import { StyledApp } from './App.styled';
 
@@ -17,37 +19,49 @@ export class App extends Component {
     largeImageURL: null,
     isLoading: false,
     query: '',
+    shouldButtonRender: false,
+    total: 0,
   };
 
   async componentDidUpdate(_, { query: prevQuery, page: prevPage }) {
-    const { query, page } = this.state;
-    if (prevQuery !== query) {
+    const { query, page, items: currentItems } = this.state;
+    const isChangedPage = page !== prevPage;
+    if (prevQuery !== query || isChangedPage) {
       this.setState({ isLoading: true });
-      const items = await this.getPhotos();
-      this.setState({ items: items, isLoading: false });
-      return;
-    }
-    if (prevPage !== page) {
-      this.setState({ isLoading: true });
-      const items = await this.getPhotos();
+      const { items, total } = await this.getPhotosAndTotal();
+      if (items.length === 0) {
+        toast.error('No found images');
+        this.setState({ isLoading: false });
+        return;
+      }
       this.setState(({ items: prevItems }) => ({
-        items: [...prevItems, ...items],
+        items: isChangedPage ? [...prevItems, ...items] : items,
         isLoading: false,
       }));
-      return;
+      if (currentItems.length + items.length < total) {
+        this.setState({ shouldButtonRender: true });
+      } else {
+        this.setState({ shouldButtonRender: false, isLoading: false });
+        return;
+      }
     }
   }
 
   handleFormSubmit = async name => {
-    this.setState({ items: [], page: 1, query: name });
+    this.setState({
+      items: [],
+      page: 1,
+      query: name,
+      shouldButtonRender: false,
+    });
   };
 
-  getPhotos = async () => {
-    const items = await fetchPhotos({
+  getPhotosAndTotal = async () => {
+    const { items, total } = await fetchPhotos({
       name: this.state.query,
       page: this.state.page,
     });
-    return items;
+    return { items, total };
   };
 
   openModal = image => {
@@ -62,18 +76,19 @@ export class App extends Component {
     this.setState(prevState => ({ page: prevState.page + 1 }));
   };
   render() {
-    const { items, largeImageURL, isLoading } = this.state;
+    const { items, largeImageURL, isLoading, shouldButtonRender } = this.state;
     return (
       <StyledApp>
         <Searchbar onSubmit={this.handleFormSubmit} />
 
         {isLoading && <Loader />}
         <ImageGallery items={items} onItemClick={this.openModal} />
-        {items.length > 0 && <Button onClick={this.onButtonClick} />}
+        {shouldButtonRender && <Button onClick={this.onButtonClick} />}
 
         {largeImageURL && (
           <Modal onClose={this.closeModal} largeImageURL={largeImageURL} />
         )}
+        <ToastContainer />
       </StyledApp>
     );
   }
