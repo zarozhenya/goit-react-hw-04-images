@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -12,84 +12,72 @@ import { Button } from 'components/Button';
 
 import { fetchPhotos } from 'api';
 
-export class App extends Component {
-  state = {
-    page: 1,
-    items: [],
-    largeImageURL: null,
-    isLoading: false,
-    query: '',
-    shouldButtonRender: false,
-    total: 0,
-  };
+export const App = () => {
+  const [page, setPage] = useState(0);
+  const [items, setItems] = useState([]);
+  const [largeImageURL, setLargeImageURL] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [query, setQuery] = useState('');
+  const [shouldButtonRender, setShouldButtonRender] = useState(false);
 
-  async componentDidUpdate(_, { query: prevQuery, page: prevPage }) {
-    const { query, page, items: currentItems } = this.state;
-    const isChangedPage = page !== prevPage;
-    if (prevQuery !== query || isChangedPage) {
-      this.setState({ isLoading: true });
-      const { items, total } = await this.getPhotosAndTotal();
+  const itemsLength = useRef(0);
+
+  useEffect(() => {
+    const getPhotosAndTotal = async () => {
+      const { items, total } = await fetchPhotos({
+        name: query,
+        page: page,
+      });
+      return { items, total };
+    };
+
+    if (!query) return;
+    setIsLoading(true);
+
+    getPhotosAndTotal().then(({ items, total }) => {
       if (items.length === 0) {
         toast.error('No found images');
-        this.setState({ isLoading: false });
+        setIsLoading(false);
         return;
       }
-      this.setState(({ items: prevItems }) => ({
-        items: isChangedPage ? [...prevItems, ...items] : items,
-        isLoading: false,
-      }));
-      if (currentItems.length + items.length < total) {
-        this.setState({ shouldButtonRender: true });
-      } else {
-        this.setState({ shouldButtonRender: false, isLoading: false });
+      setItems(prev => [...prev, ...items]);
+      setIsLoading(false);
+      itemsLength.current += items.length;
+      if (itemsLength.current < total) {
+        setShouldButtonRender(true);
         return;
       }
-    }
-  }
-
-  handleFormSubmit = async name => {
-    this.setState({
-      items: [],
-      page: 1,
-      query: name,
-      shouldButtonRender: false,
+      setShouldButtonRender(false);
+      setIsLoading(false);
     });
+  }, [query, page]);
+
+  const handleFormSubmit = name => {
+    setItems([]);
+    setPage(1);
+    setQuery(name);
+    setShouldButtonRender(false);
   };
 
-  getPhotosAndTotal = async () => {
-    const { items, total } = await fetchPhotos({
-      name: this.state.query,
-      page: this.state.page,
-    });
-    return { items, total };
+  const onButtonClick = () => {
+    setPage(prev => prev + 1);
   };
 
-  openModal = image => {
-    this.setState({ largeImageURL: image });
-  };
+  return (
+    <StyledApp>
+      <Searchbar onSubmit={handleFormSubmit} />
 
-  closeModal = () => {
-    this.setState({ largeImageURL: null });
-  };
+      {isLoading && <Loader />}
+      <ImageGallery items={items} onItemClick={setLargeImageURL} />
+      {shouldButtonRender && <Button onClick={onButtonClick} />}
 
-  onButtonClick = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
-  };
-  render() {
-    const { items, largeImageURL, isLoading, shouldButtonRender } = this.state;
-    return (
-      <StyledApp>
-        <Searchbar onSubmit={this.handleFormSubmit} />
-
-        {isLoading && <Loader />}
-        <ImageGallery items={items} onItemClick={this.openModal} />
-        {shouldButtonRender && <Button onClick={this.onButtonClick} />}
-
-        {largeImageURL && (
-          <Modal onClose={this.closeModal} largeImageURL={largeImageURL} />
-        )}
-        <ToastContainer />
-      </StyledApp>
-    );
-  }
-}
+      {largeImageURL && (
+        <Modal
+          onClose={() => setLargeImageURL(null)}
+          largeImageURL={largeImageURL}
+        />
+      )}
+      <ToastContainer />
+    </StyledApp>
+  );
+};
